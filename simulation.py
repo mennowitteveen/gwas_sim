@@ -6,7 +6,7 @@ import datetime
 
 class GWASsim(object):
 
-    def __init__(self, num_samples, num_snps, num_causal, noise_var = 0.1, genetic_var = 0.1, num_phenotypes = 1, num_differentiated = 0, perc_causal_differentiated = 0.5, MAF = 0.05, Fst = 0.1, diploid = True, add_assoc = True, add_noise = True, add_interactions = False, pop_struct = True):
+    def __init__(self, num_samples, num_snps, num_causal, pheno_transform = None, transform_param = 2.0, noise_var = 0.1, genetic_var = 0.1, num_phenotypes = 1, num_differentiated = 0, perc_causal_differentiated = 0.5, MAF = 0.05, Fst = 0.1, diploid = True, add_assoc = True, add_noise = True, add_interactions = False, pop_struct = True):
 
         self.Z = {}
         self.N = num_samples
@@ -23,15 +23,17 @@ class GWASsim(object):
             
         self.num_differentiated = num_differentiated
         self.perc_causal_differentiated = perc_causal_differentiated
-        
-        # Variances
-        self.noise_var = noise_var
-        self.genetic_var = genetic_var
-        
         if diploid:
             self.chr_copies = 2
         else:
             self.chr_copies = 1
+
+        # Phenotype transformations
+        self.pheno_transform = pheno_transform
+        self.transform_param = transform_param
+        # Variances
+        self.noise_var = noise_var
+        self.genetic_var = genetic_var
 
         self.pop_struct = pop_struct
         self.generate_snps()
@@ -60,7 +62,13 @@ class GWASsim(object):
 
         for k in self.Z.keys():
             self.Y += self.Z[k]
-        
+
+        if self.pheno_transform != None:
+            if self.pheno_transform == "exp_ay":
+                self.Y_transformed = np.exp(self.transform_param * self.Y)
+            elif self.pheno_transform == "exp_root":
+                self.Y_transformed = np.exp(self.Y)**(1.0/self.transform_param)
+            
     def generate_names(self):
         """
         Generates SNP/sample/phenotype names. The causal SNPs have "causal_" prepended 
@@ -168,13 +176,14 @@ class GWASsim(object):
         if self.pop_struct:
             message += "Population structure: \n\t %d differentiated causal SNPs (%d total differentiated SNPs), F_st = %.3f\n\n" % (int(self.num_causal*self.perc_causal_differentiated), self.num_differentiated, self.Fst)
         message += "Variance components: \n\t noise=%.4f, genetic=%.4f" % (self.noise_var, self.genetic_var)
-        
+        if self.pheno_transform != None:
+            message += "\n\nPhenotype transformation: \n\t %s, parameter = %.2f" % (self.pheno_transform, self.transform_param)
         return message
             
         
 
 if __name__ == '__main__':
-    sim = GWASsim(500, 5000, 100, num_differentiated = 1000, genetic_var = 0.1, pop_struct = True)
+    sim = GWASsim(500, 5000, 100, num_differentiated = 1000, genetic_var = 0.1, pop_struct = True, pheno_transform = "exp_ay")
     print sim
     from panama.core import testing
     K = np.dot(sim.X, sim.X.T)
